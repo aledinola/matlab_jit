@@ -69,6 +69,37 @@ Measured on 2026-08-25 with MATLAB R2026a Update 4 (64-bit Windows):
 
 The benchmark times only `sub_vfi`; parameter construction, tests, and console output are excluded. Timing is machine- and MATLAB-release-specific.
 
+### JIT-aware benchmarking protocol
+
+The reported `timeit` result measures steady-state execution after MATLAB has had an opportunity to JIT-compile the functions. It was obtained in one MATLAB session with:
+
+```matlab
+main  % Complete first solve; initializes inputs and warms the JIT compiler
+
+benchmark_seconds = timeit(@() sub_vfi(params,numerics));
+```
+
+`sub_vfi` initializes the value function on every invocation, so every `timeit` evaluation performs a complete VFI solve. MATLAB reuses the compiled function code across evaluations. The creation and invocation of the anonymous Bellman objective inside `sub_vfi` are part of every timed solve and hence are included in the result. The outer zero-input wrapper required by `timeit` is also included.
+
+The first-solve and warmed timings answer different questions:
+
+- The first-solve time includes one-time loading and JIT-compilation effects.
+- The warmed `timeit` result measures the recurring cost once compiled code is available and is the primary benchmark for studying JIT-sensitive implementations.
+
+Do not run `clear functions` or `clear all` between warm-up and measurement, because either can discard compiled function state. For a fair comparison with a future implementation, warm up both versions and measure them in the same MATLAB session using identical inputs:
+
+```matlab
+% Warm up each complete solver once.
+sub_vfi(params,numerics);
+sub_vfi_improved(params,numerics);
+
+% Compare steady-state runtimes after JIT compilation.
+t_benchmark = timeit(@() sub_vfi(params,numerics));
+t_improved = timeit(@() sub_vfi_improved(params,numerics));
+```
+
+Correctness should be checked separately before interpreting the timing comparison.
+
 ## Files
 
 - `main.m`: calibration, grids, transition matrix, solve, timing, and quick tests.
