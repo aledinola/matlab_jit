@@ -53,11 +53,6 @@ while error_v > tol_vfi && iteration < max_iter
         for ia = 1:n_a
             resources = R*a_grid(ia) + z_now;
             a_upper = min(a_max,resources-c_floor);
-            if a_upper < a_min
-                error('sub_vfi_1:InfeasibleState', ...
-                    'No feasible asset choice at asset index %d, shock index %d.', ...
-                    ia,iz);
-            end
 
             % Inline golden-section maximization. The Bellman RHS remains a
             % separate function, but no function handle or closure is used.

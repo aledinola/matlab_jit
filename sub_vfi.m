@@ -48,11 +48,6 @@ while error_v > tol_vfi && iteration < max_iter
         for ia = 1:n_a
             resources = R*a_grid(ia) + z_now;
             a_upper = min(a_max,resources-c_floor);
-            if a_upper < a_min
-                error('sub_vfi:InfeasibleState', ...
-                    'No feasible asset choice at asset index %d, shock index %d.', ...
-                    ia,iz);
-            end
 
             % This closure is intentionally the benchmark whose JIT overhead
             % later implementations will seek to reduce.
