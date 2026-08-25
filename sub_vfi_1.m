@@ -21,10 +21,14 @@ n_a = params.n_a;
 n_z = params.n_z;
 a_min = params.a_min;
 a_max = params.a_max;
+b = params.b;
+tol_vfi = numerics.tol_vfi;
+max_iter = numerics.max_iter;
+tol_golden = numerics.tol_golden;
 
 V = zeros(n_a,n_z);
 for iz = 1:n_z
-    V(:,iz) = log(R*a_grid+z_grid(iz)+params.b)/(1-beta);
+    V(:,iz) = log(R*a_grid+z_grid(iz)+b)/(1-beta);
 end
 V_new = zeros(n_a,n_z);
 a_policy = zeros(n_a,n_z);
@@ -37,7 +41,7 @@ alpha_left = (3-sqrt(5))/2;
 alpha_right = (sqrt(5)-1)/2;
 alpha_product = alpha_left*alpha_right;
 
-while error_v > numerics.tol_vfi && iteration < numerics.max_iter
+while error_v > tol_vfi && iteration < max_iter
     iteration = iteration + 1;
 
     % EV(ia,iz) = sum_izprime V(ia,izprime)*pi_z(iz,izprime).
@@ -64,7 +68,7 @@ while error_v > numerics.tol_vfi && iteration < numerics.max_iter
             f_right = rhs_bellman(x_right,resources,beta,gamma,a_grid,EV_z);
 
             distance = alpha_product*distance;
-            while distance > numerics.tol_golden
+            while distance > tol_golden
                 distance = distance*alpha_right;
                 if f_right < f_left
                     x_right = x_left;
@@ -96,9 +100,8 @@ while error_v > numerics.tol_vfi && iteration < numerics.max_iter
 end
 
 c_policy = R*a_grid + z_grid.' - a_policy;
-info.converged = error_v <= numerics.tol_vfi;
+info.converged = error_v <= tol_vfi;
 info.iterations = iteration;
 info.error = error_v;
 
 end %end function
-
