@@ -1,6 +1,6 @@
 # MATLAB JIT benchmark: income fluctuation problem
 
-This repository contains a standard continuous-choice value function iteration (VFI) implementation of the income fluctuation problem in MATLAB. `sub_vfi` is the benchmark implementation of the VFI, and we plan to improve it in the future by testing formulations that allow MATLAB's JIT compiler to eliminate more function-call overhead.
+This repository contains continuous-choice value function iteration (VFI) implementations of the income fluctuation problem in MATLAB. `sub_vfi` is the benchmark implementation. `sub_vfi_1` is the first improved implementation and inlines golden-section search inside the VFI state loop so MATLAB's JIT compiler sees the search control flow directly.
 
 The benchmark intentionally creates an anonymous function of the form
 
@@ -9,6 +9,14 @@ objective = @(aprime) rhs_bellman(aprime,resources,beta,gamma,a_grid,EV_z);
 ```
 
 at each state and passes it to `golden`. This design makes the anonymous-function and function-handle overhead explicit for future comparisons.
+
+`sub_vfi_1` preserves the same Bellman function, interpolation routine, search arithmetic, tolerances, and initialization. It replaces the call to `golden` and the anonymous objective with the inlined golden-section loop and direct calls such as
+
+```matlab
+f_left = rhs_bellman(x_left,resources,beta,gamma,a_grid,EV_z);
+```
+
+The golden-ratio constants, which are invariant across states and iterations, are also computed once per solver call in `sub_vfi_1`.
 
 ## Model and algorithm
 
@@ -34,7 +42,7 @@ The economic calibration follows QuantEcon's Julia lecture [Optimal Savings III:
 | Discount factor `beta` | 0.96 |
 | Utility | `log(c)` |
 | Borrowing parameter `b` | 0 |
-| Asset grid | 50 points on [0, 16] |
+| Asset grid | 600 points on [0, 16] |
 | Income states `z_grid` | [0.5, 1.0] |
 | Transition matrix `pi_z` | [0.60 0.40; 0.05 0.95] |
 | VFI tolerance | 1e-5 |
@@ -61,41 +69,44 @@ The full-model tests require convergence, a finite value function strictly incre
 
 ## Measured running time
 
-Measured on 2026-08-25 with MATLAB R2026a Update 4 (64-bit Windows):
+Measured on 2026-08-25 with MATLAB R2026a Update 4 (64-bit Windows) and the 600-point asset grid:
 
-- Warmed `timeit(@() sub_vfi(params,numerics))`: **0.113074 seconds**.
-- The preceding validation solve, including the first call in that MATLAB session: **0.148306 seconds**.
-- Convergence: **297 VFI iterations**, with final sup-norm error **9.721e-6**.
+| Implementation | Warmed `timeit` runtime |
+|---|---:|
+| `sub_vfi` benchmark | **1.748796 seconds** |
+| `sub_vfi_1` inline golden | **1.341655 seconds** |
 
-The benchmark times only `sub_vfi`; parameter construction, tests, and console output are excluded. Timing is machine- and MATLAB-release-specific.
+Inlining golden-section search produced a measured **1.303x speedup**. Both implementations converged in 297 VFI iterations with final sup-norm error approximately `9.727e-6`, and their value and policy arrays agreed to the test tolerance of `1e-12`.
+
+The measurements time only the complete solver calls; parameter construction, correctness tests, and console output are excluded. Timing is machine- and MATLAB-release-specific.
 
 ### JIT-aware benchmarking protocol
 
-The reported `timeit` result measures steady-state execution after MATLAB has had an opportunity to JIT-compile the functions. It was obtained in one MATLAB session with:
+The reported `timeit` results measure steady-state execution after MATLAB has had an opportunity to JIT-compile both functions. They can be reproduced in one MATLAB session with:
 
 ```matlab
-main  % Complete first solve; initializes inputs and warms the JIT compiler
+main  % Initialize inputs and validate both implementations
 
-benchmark_seconds = timeit(@() sub_vfi(params,numerics));
+timing = benchmark_vfi(params,numerics);
 ```
 
-`sub_vfi` initializes the value function on every invocation, so every `timeit` evaluation performs a complete VFI solve. MATLAB reuses the compiled function code across evaluations. The creation and invocation of the anonymous Bellman objective inside `sub_vfi` are part of every timed solve and hence are included in the result. The outer zero-input wrapper required by `timeit` is also included.
+`benchmark_vfi` first runs both implementations once as an untimed warm-up and then applies `timeit` to each. Both solvers initialize the value function on every invocation, so every timed evaluation performs a complete VFI solve. MATLAB reuses the compiled function code across evaluations. The creation and invocation of the anonymous Bellman objective inside `sub_vfi` are part of every benchmark solve and hence are included in its result. The outer zero-input wrappers required by `timeit` are included for both implementations.
 
 The first-solve and warmed timings answer different questions:
 
 - The first-solve time includes one-time loading and JIT-compilation effects.
 - The warmed `timeit` result measures the recurring cost once compiled code is available and is the primary benchmark for studying JIT-sensitive implementations.
 
-Do not run `clear functions` or `clear all` between warm-up and measurement, because either can discard compiled function state. For a fair comparison with a future implementation, warm up both versions and measure them in the same MATLAB session using identical inputs:
+Do not run `clear functions` or `clear all` between warm-up and measurement, because either can discard compiled function state. The comparison uses identical inputs and measures both implementations in the same MATLAB session:
 
 ```matlab
 % Warm up each complete solver once.
 sub_vfi(params,numerics);
-sub_vfi_improved(params,numerics);
+sub_vfi_1(params,numerics);
 
 % Compare steady-state runtimes after JIT compilation.
 t_benchmark = timeit(@() sub_vfi(params,numerics));
-t_improved = timeit(@() sub_vfi_improved(params,numerics));
+t_inline = timeit(@() sub_vfi_1(params,numerics));
 ```
 
 Correctness should be checked separately before interpreting the timing comparison.
@@ -104,6 +115,8 @@ Correctness should be checked separately before interpreting the timing comparis
 
 - `main.m`: calibration, grids, transition matrix, solve, timing, and quick tests.
 - `sub_vfi.m`: benchmark VFI implementation.
+- `sub_vfi_1.m`: improved VFI with inline golden-section search.
+- `benchmark_vfi.m`: JIT warm-up and `timeit` comparison of both solvers.
 - `rhs_bellman.m`: scalar Bellman objective.
 - `golden.m`: scalar golden-section maximizer adapted from the MATLAB skill templates.
 - `interp1_scal.m` and `locate.m`: scalar linear interpolation and interval search adapted from the MATLAB skill templates.

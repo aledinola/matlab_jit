@@ -12,7 +12,7 @@ params.b = 0.0;
 % State grids and Markov transition matrix.
 params.a_min = -params.b;
 params.a_max = 16.0;
-params.n_a = 50;
+params.n_a = 600;
 params.z_grid = [0.5;1.0];
 params.pi_z = [0.60,0.40;0.05,0.95];
 params.n_z = length(params.z_grid);
@@ -29,8 +29,15 @@ tic;
 [V,a_policy,c_policy,info] = sub_vfi(params,numerics);
 vfi_seconds = toc;
 
+fprintf('Solving with inline golden-section search...\n');
+tic;
+[V_1,a_policy_1,c_policy_1,info_1] = sub_vfi_1(params,numerics);
+vfi_1_seconds = toc;
+
 % Quick economic and numerical tests.
 assert(info.converged,'VFI did not converge within the iteration limit.');
+assert(info_1.converged, ...
+    'Inline-golden VFI did not converge within the iteration limit.');
 assert(all(isfinite(V),'all'),'The value function contains nonfinite values.');
 assert(all(diff(V,1,1) > 0,'all'), ...
     'The value function is not strictly increasing in assets.');
@@ -48,7 +55,18 @@ resources = params.R*params.a_grid + params.z_grid.';
 budget_error = max(abs(c_policy-(resources-a_policy)),[],'all');
 assert(budget_error < 1.0e-12,'The budget constraint is not satisfied.');
 
+% The inline implementation must reproduce the benchmark solution.
+assert(max(abs(V_1-V),[],'all') < 1.0e-12, ...
+    'Inline-golden and benchmark value functions differ.');
+assert(max(abs(a_policy_1-a_policy),[],'all') < 1.0e-12, ...
+    'Inline-golden and benchmark asset policies differ.');
+assert(max(abs(c_policy_1-c_policy),[],'all') < 1.0e-12, ...
+    'Inline-golden and benchmark consumption policies differ.');
+assert(info_1.iterations == info.iterations, ...
+    'Inline-golden and benchmark iteration counts differ.');
+
 fprintf('Converged in %d iterations (sup-norm error %.3e).\n', ...
     info.iterations,info.error);
 fprintf('VFI running time: %.6f seconds.\n',vfi_seconds);
+fprintf('Inline-golden VFI running time: %.6f seconds.\n',vfi_1_seconds);
 fprintf('All tests passed.\n');
