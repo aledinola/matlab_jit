@@ -73,10 +73,10 @@ Measured on 2026-08-25 with MATLAB R2026a Update 4 (64-bit Windows) and the 600-
 
 | Implementation | Warmed `timeit` runtime |
 |---|---:|
-| `sub_vfi` benchmark | **1.748796 seconds** |
-| `sub_vfi_1` inline golden | **1.341655 seconds** |
+| `sub_vfi` benchmark | **1.725192 seconds** |
+| `sub_vfi_1` inline golden | **1.138214 seconds** |
 
-Inlining golden-section search produced a measured **1.303x speedup**. Both implementations converged in 297 VFI iterations with final sup-norm error approximately `9.727e-6`, and their value and policy arrays agreed to the test tolerance of `1e-12`.
+Inlining golden-section search produced a measured **1.516x speedup**. Both implementations converged in 297 VFI iterations with final sup-norm error approximately `9.727e-6`, and their value and policy arrays agreed to the test tolerance of `1e-12`.
 
 The measurements time only the complete solver calls; parameter construction, correctness tests, and console output are excluded. Timing is machine- and MATLAB-release-specific.
 
